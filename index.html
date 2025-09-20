@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Gerar Todas as Etiquetas Faltantes</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: url("sample_0 (1).jpg") no-repeat center center fixed;
+      background-size: cover;
+      color: #fff;
+    }
+    .overlay {
+      background: rgba(0,0,0,0.75);
+      padding: 40px;
+      border-radius: 15px;
+      box-shadow: 0px 8px 20px rgba(0,0,0,0.5);
+      text-align: center;
+      max-width: 700px;
+      width: 95%;
+    }
+    h2 {
+      margin-bottom: 20px;
+      color: #fff;
+    }
+    input[type="file"] {
+      margin: 15px 0;
+      color: #fff;
+    }
+    button {
+      padding: 10px 25px;
+      border: none;
+      border-radius: 25px;
+      background: #fff;
+      color: #000;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+    button:hover {
+      background: #ccc;
+    }
+    #resultado {
+      margin-top: 20px;
+      text-align: left;
+      font-size: 14px;
+      background: rgba(255,255,255,0.1);
+      padding: 15px;
+      border-radius: 10px;
+      max-height: 350px;
+      overflow-y: auto;
+    }
+    a {
+      display: inline-block;
+      margin-top: 20px;
+      padding: 10px 25px;
+      text-decoration: none;
+      background: #fff;
+      color: #000;
+      border-radius: 25px;
+      font-weight: bold;
+      transition: 0.3s;
+    }
+    a:hover {
+      background: #ccc;
+    }
+  </style>
+</head>
+<body>
+  <div class="overlay">
+    <h2>Gerar Todas as Etiquetas Faltantes</h2>
+    <input type="file" id="fileInput" accept=".txt" multiple>
+    <br>
+    <button id="processBtn">Verificar e Gerar</button>
+    <div id="resultado"></div>
+    <a id="downloadLink" style="display:none;">⬇️ Baixar todas as etiquetas faltantes</a>
+  </div>
+
+  <script>
+    document.getElementById("processBtn").addEventListener("click", () => {
+      const fileInput = document.getElementById("fileInput");
+      const resultadoDiv = document.getElementById("resultado");
+      resultadoDiv.innerHTML = "";
+
+      if (!fileInput.files.length) {
+        alert("Selecione ao menos um arquivo!");
+        return;
+      }
+
+      let faltantesGlobais = "";
+      let resumo = [];
+      let arquivosLidos = 0;
+
+      [...fileInput.files].forEach(file => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          let content = e.target.result;
+
+          // Separar blocos ^XA ... ^XZ
+          let blocks = content.split(/\^XZ/).filter(b => b.trim().length > 0).map(b => b + "^XZ");
+
+          // Mapear número -> bloco
+          let mapping = {};
+          blocks.forEach(b => {
+            let m = b.match(/51544140\/(\d{3,4})/);
+            if (m) mapping[parseInt(m[1])] = b;
+          });
+
+          let numeros = Object.keys(mapping).map(n => parseInt(n)).sort((a,b)=>a-b);
+          let min = Math.min(...numeros);
+          let max = Math.max(...numeros);
+
+          // Descobrir faltantes
+          let faltantes = [];
+          for (let i = min; i <= max; i++) {
+            if (!numeros.includes(i)) {
+              faltantes.push(i);
+            }
+          }
+
+          // Usar bloco base como template
+          let template = mapping[min];
+          function gerarBloco(num, template) {
+            return template.replace(/51544140\/\d{3,4}/g, "51544140/" + num);
+          }
+
+          // Criar blocos faltantes
+          faltantes.forEach(num => {
+            faltantesGlobais += gerarBloco(num, template) + "\n";
+          });
+
+          // Adicionar resumo
+          resumo.push(`
+            <div style="margin-bottom:10px;">
+              <b>Arquivo:</b> ${file.name}<br>
+              <b>Intervalo:</b> ${min} - ${max}<br>
+              <b>Encontrados:</b> ${numeros.length}<br>
+              <b>Faltando (${faltantes.length}):</b> ${faltantes.length > 0 ? faltantes.join(", ") : "Nenhum"}
+            </div>
+          `);
+
+          arquivosLidos++;
+
+          if (arquivosLidos === fileInput.files.length) {
+            resultadoDiv.innerHTML = resumo.join("<hr>");
+
+            if (faltantesGlobais.trim() !== "") {
+              const blob = new Blob([faltantesGlobais], {type: "text/plain"});
+              const url = URL.createObjectURL(blob);
+              const link = document.getElementById("downloadLink");
+              link.href = url;
+              link.download = "todas_etiquetas_faltantes.txt";
+              link.style.display = "inline-block";
+            } else {
+              document.getElementById("downloadLink").style.display = "none";
+            }
+          }
+        };
+        reader.readAsText(file);
+      });
+    });
+  </script>
+</body>
+</html>
